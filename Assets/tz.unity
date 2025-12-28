@@ -496,6 +496,55 @@ Transform:
   - {fileID: 1132318289}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &740939823 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1788623314744564116, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
+    type: 3}
+  m_PrefabInstance: {fileID: 1788623315645699377}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &740939827 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1788623314744564119, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
+    type: 3}
+  m_PrefabInstance: {fileID: 1788623315645699377}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &740939828
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 740939823}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25b139dce454e594c945bd43562a7003, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerActives
+  walkSpeed: 2
+  sprintSpeed: 4
+  gravity: -20
+  jumpHeight: 0.6
+  groundDrag: 8
+  airDrag: 0.5
+  dashSpeed: 8
+  dashDuration: 0.2
+  dashCooldown: 2
+  slideStartSpeed: 3
+  slideMinSpeed: 0.5
+  slideDrag: 2
+  slideCameraHeight: -0.5
+  cameraLerpSpeed: 8
+  cam: {fileID: 1896070440}
+  sensitivity: 50
+  maxStamina: 50
+  staminaRegenRate: 5
+  staminaRegenDelay: 3
+  sprintStaminaCost: 5
+  jumpStaminaCost: 10
+  dashStaminaCost: 15
+  maxHealth: 100
+  startingGold: 0
+  emoteSound: {fileID: 0}
 --- !u!1 &1039250397
 GameObject:
   m_ObjectHideFlags: 0
@@ -990,11 +1039,77 @@ Transform:
   m_Children: []
   m_Father: {fileID: 492865513}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1750365558
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1750365559}
+  - component: {fileID: 1750365560}
+  m_Layer: 0
+  m_Name: PlayerUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1750365559
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1750365558}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.36359, y: 0, z: 1.26781}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 740939827}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1750365560
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1750365558}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81a8664009644d54a94d0319e3ba7b88, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerUI
+  player: {fileID: 0}
+  healthBarFill: {fileID: 0}
+  staminaBarFill: {fileID: 0}
+  goldText: {fileID: 0}
+  postProcessVolume: {fileID: 0}
+  maxVignetteIntensity: 0.5
+  vignetteSmoothing: 5
+  dashBlurIntensity: 0.4
+  sprintBlurIntensity: 0.1
+  blurSmoothing: 8
+  useCanvasUI: 0
+  healthColor: {r: 0.8, g: 0.2, b: 0.2, a: 1}
+  healthBgColor: {r: 0.3, g: 0.1, b: 0.1, a: 0.8}
+  staminaColor: {r: 0.9, g: 0.8, b: 0.2, a: 1}
+  staminaBgColor: {r: 0.4, g: 0.35, b: 0.1, a: 0.8}
+  goldColor: {r: 1, g: 0.85, b: 0.3, a: 1}
 --- !u!54 &1836302186 stripped
 Rigidbody:
   m_CorrespondingSourceObject: {fileID: 2154093491337763531, guid: 8a7d6d4a08fa6494b9f3c8a1edf29483,
     type: 3}
   m_PrefabInstance: {fileID: 6191122749935779586}
+  m_PrefabAsset: {fileID: 0}
+--- !u!20 &1896070440 stripped
+Camera:
+  m_CorrespondingSourceObject: {fileID: 1788623315372294392, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
+    type: 3}
+  m_PrefabInstance: {fileID: 1788623315645699377}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &2045444926
 GameObject:
@@ -1052,9 +1167,24 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 481995042327841608, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
         type: 3}
+      propertyPath: gravity
+      value: -15
+      objectReference: {fileID: 0}
+    - target: {fileID: 481995042327841608, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
+        type: 3}
       propertyPath: swordRb
       value: 
       objectReference: {fileID: 1836302186}
+    - target: {fileID: 481995042327841608, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
+        type: 3}
+      propertyPath: moveSpeed
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 481995042327841608, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
+        type: 3}
+      propertyPath: jumpHeight
+      value: 0.6
+      objectReference: {fileID: 0}
     - target: {fileID: 481995042327841608, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
         type: 3}
       propertyPath: swordAnchor
@@ -1453,8 +1583,16 @@ PrefabInstance:
     m_RemovedComponents:
     - {fileID: 3388884898106590061, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e, type: 3}
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 1788623314744564119, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1750365559}
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1788623314744564116, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 740939828}
     - targetCorrespondingSourceObject: {fileID: 2383614408247076845, guid: 0630ddb66c43ce74b926a6ec5e0b0b3e,
         type: 3}
       insertIndex: -1
