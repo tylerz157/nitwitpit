@@ -53,7 +53,12 @@ public class PlayerController : MonoBehaviour
     {
         isGrounded = controller.isGrounded;
 
-        // Toggle Combat Mode based on Left Click
+        // Detect the exact frame the button is released
+        if (Mouse.current.leftButton.wasReleasedThisFrame)
+        {
+            ApplySwordBrake();
+        }
+
         isCombatMode = Mouse.current.leftButton.isPressed;
 
         if (!isCombatMode)
@@ -172,14 +177,38 @@ public class PlayerController : MonoBehaviour
         hasReachedWindUp = false;
     }
 
-    void ResetSwordPosition()
+    void ApplySwordBrake()
     {
-        // Smoothly bring the anchor back to center and zero out delta
-        swordAnchor.localRotation = Quaternion.Slerp(swordAnchor.localRotation, Quaternion.identity, Time.deltaTime * returnSpeed);
-        accumulatedMouseDelta = Vector2.MoveTowards(accumulatedMouseDelta, Vector2.zero, Time.deltaTime * sensitivity);
+        // Kill the physical momentum immediately
+        swordRb.angularVelocity = Vector3.zero;
+        swordRb.linearVelocity = Vector3.zero;
+
+        // Temporarily crank up drag to prevent "wobble"
+        swordRb.angularDamping = 20f;
+        swordRb.linearDamping = 5f;
+
+        // Reset tracking variables
+        accumulatedMouseDelta = Vector2.zero;
         hasReachedWindUp = false;
+
+        // Return drag to normal after the sword has settled (0.2 seconds)
+        Invoke("RestoreNormalPhysics", 0.2f);
     }
 
+    void RestoreNormalPhysics()
+    {
+        swordRb.angularDamping = 2f; // Or whatever your default was
+        swordRb.linearDamping = 0f;
+    }
+
+    void ResetSwordPosition()
+    {
+        // Rapidly snap the anchor back to the default camera forward position
+        swordAnchor.localRotation = Quaternion.Slerp(swordAnchor.localRotation, Quaternion.identity, Time.deltaTime * 20f);
+
+        // Ensure the accumulated delta doesn't "leak" into the next click
+        accumulatedMouseDelta = Vector2.zero;
+    }
     void OnEnable() => input.Enable();
     void OnDisable() => input.Disable();
 }
