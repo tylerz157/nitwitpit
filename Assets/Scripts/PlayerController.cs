@@ -1,208 +1,146 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Animations.Rigging;
 
 public class PlayerController : MonoBehaviour
 {
     PlayerInput playerInput;
     PlayerInput.MainActions input;
-
     CharacterController controller;
-    Animator animator;
-    AudioSource audioSource;
 
-    [Header("Controller")]
-    public float moveSpeed = 5;
-    public float gravity = -9.8f;
+    [Header("Movement")]
+    public float moveSpeed = 5f;
+    public float gravity = -9.81f;
     public float jumpHeight = 1.2f;
-
-    Vector3 _PlayerVelocity;
-
-    bool isGrounded;
 
     [Header("Camera")]
     public Camera cam;
-    public float sensitivity;
+    public float sensitivity = 100f;
 
-    float xRotation = 0f;
+    [Header("Physics Sword")]
+    public ConfigurableJoint swordJoint;
+    public Transform swordAnchor;
+    public float swordSwayIntensity = 300f;
+    public float swordSmoothSpeed = 10f;
+
+    [Header("IK Rigging")]
+    public Rig armRig;
+
+    private Vector3 _PlayerVelocity;
+    private bool isGrounded;
+    private float xRotation = 0f;
+    private bool isAttackingMode = false;
+    private Quaternion swordTargetRotation = Quaternion.identity;
 
     void Awake()
-    { 
+    {
         controller = GetComponent<CharacterController>();
-        animator = GetComponentInChildren<Animator>();
-        audioSource = GetComponent<AudioSource>();
-
-        playerInput = new PlayerInput();
+        playerInput = new @PlayerInput(); // Use the @ symbol as defined in your generated class
         input = playerInput.Main;
-        AssignInputs();
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        input.Jump.performed += ctx => Jump();
+
+        if (swordJoint != null)
+            swordTargetRotation = swordJoint.transform.localRotation;
     }
 
     void Update()
     {
         isGrounded = controller.isGrounded;
 
-        // Repeat Inputs
-        if(input.Attack.IsPressed())
-        { Attack(); }
+        // Check the attack button state
+        isAttackingMode = input.Attack.IsPressed();
 
-        SetAnimations();
-    }
-
-    void FixedUpdate() 
-    { MoveInput(input.Movement.ReadValue<Vector2>()); }
-
-    void LateUpdate() 
-    { LookInput(input.Look.ReadValue<Vector2>()); }
-
-    void MoveInput(Vector2 input)
-    {
-        Vector3 moveDirection = Vector3.zero;
-        moveDirection.x = input.x;
-        moveDirection.z = input.y;
-
-        controller.Move(transform.TransformDirection(moveDirection) * moveSpeed * Time.deltaTime);
-        _PlayerVelocity.y += gravity * Time.deltaTime;
-        if(isGrounded && _PlayerVelocity.y < 0)
-            _PlayerVelocity.y = -2f;
-        controller.Move(_PlayerVelocity * Time.deltaTime);
-    }
-
-    void LookInput(Vector3 input)
-    {
-        float mouseX = input.x;
-        float mouseY = input.y;
-
-        xRotation -= (mouseY * Time.deltaTime * sensitivity);
-        xRotation = Mathf.Clamp(xRotation, -80, 80);
-
-        cam.transform.localRotation = Quaternion.Euler(xRotation, 0, 0);
-
-        transform.Rotate(Vector3.up * (mouseX * Time.deltaTime * sensitivity));
-    }
-
-    void OnEnable() 
-    { input.Enable(); }
-
-    void OnDisable()
-    { input.Disable(); }
-
-    void Jump()
-    {
-        // Adds force to the player rigidbody to jump
-        if (isGrounded)
-            _PlayerVelocity.y = Mathf.Sqrt(jumpHeight * -3.0f * gravity);
-    }
-
-    void AssignInputs()
-    {
-        input.Jump.performed += ctx => Jump();
-        input.Attack.started += ctx => Attack();
-    }
-
-    // ---------- //
-    // ANIMATIONS //
-    // ---------- //
-
-    public const string IDLE = "Idle";
-    public const string WALK = "Walk";
-    public const string ATTACK1 = "Attack 1";
-    public const string ATTACK2 = "Attack 2";
-
-    string currentAnimationState;
-
-    public void ChangeAnimationState(string newState) 
-    {
-        // STOP THE SAME ANIMATION FROM INTERRUPTING WITH ITSELF //
-        if (currentAnimationState == newState) return;
-
-        // PLAY THE ANIMATION //
-        currentAnimationState = newState;
-        animator.CrossFadeInFixedTime(currentAnimationState, 0.2f);
-    }
-
-    void SetAnimations()
-    {
-        // If player is not attacking
-        if(!attacking)
+        // EMERGENCY DEBUG 1: Is the button working?
+        if (isAttackingMode)
         {
-            if(_PlayerVelocity.x == 0 &&_PlayerVelocity.z == 0)
-            { ChangeAnimationState(IDLE); }
-            else
-            { ChangeAnimationState(WALK); }
+            Debug.Log("Left Click Detected!");
+        }
+
+        if (armRig != null)
+        {
+            armRig.weight = Mathf.Lerp(armRig.weight, isAttackingMode ? 1f : 0.8f, Time.deltaTime * 5f);
         }
     }
 
-    // ------------------- //
-    // ATTACKING BEHAVIOUR //
-    // ------------------- //
-
-    [Header("Attacking")]
-    public float attackDistance = 3f;
-    public float attackDelay = 0.4f;
-    public float attackSpeed = 1f;
-    public int attackDamage = 1;
-    public LayerMask attackLayer;
-
-    public GameObject hitEffect;
-    public AudioClip swordSwing;
-    public AudioClip hitSound;
-
-    bool attacking = false;
-    bool readyToAttack = true;
-    int attackCount;
-
-    public void Attack()
+    void FixedUpdate()
     {
-        if(!readyToAttack || attacking) return;
+        MoveInput(input.Movement.ReadValue<Vector2>());
+        UpdateSwordPhysics();
+    }
 
-        readyToAttack = false;
-        attacking = true;
+    void LateUpdate()
+    {
+        Vector2 mouseDelta = input.Look.ReadValue<Vector2>();
 
-        Invoke(nameof(ResetAttack), attackSpeed);
-        Invoke(nameof(AttackRaycast), attackDelay);
-
-        audioSource.pitch = Random.Range(0.9f, 1.1f);
-        audioSource.PlayOneShot(swordSwing);
-
-        if(attackCount == 0)
+        if (!isAttackingMode)
         {
-            ChangeAnimationState(ATTACK1);
-            attackCount++;
+            LookInput(mouseDelta);
         }
         else
         {
-            ChangeAnimationState(ATTACK2);
-            attackCount = 0;
+            // EMERGENCY DEBUG 2: Is the mouse moving?
+            if (mouseDelta.sqrMagnitude > 0)
+            {
+                Debug.Log("Swinging Sword! Mouse Delta: " + mouseDelta);
+            }
+            SwingSword(mouseDelta);
         }
     }
 
-    void ResetAttack()
+    void MoveInput(Vector2 moveInput)
     {
-        attacking = false;
-        readyToAttack = true;
+        Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
+        controller.Move(move * moveSpeed * Time.deltaTime);
+        _PlayerVelocity.y += gravity * Time.deltaTime;
+        if (isGrounded && _PlayerVelocity.y < 0) _PlayerVelocity.y = -2f;
+        controller.Move(_PlayerVelocity * Time.deltaTime);
     }
 
-    void AttackRaycast()
+    void LookInput(Vector2 lookInput)
     {
-        if(Physics.Raycast(cam.transform.position, cam.transform.forward, out RaycastHit hit, attackDistance, attackLayer))
-        { 
-            HitTarget(hit.point);
-
-            if(hit.transform.TryGetComponent<Actor>(out Actor T))
-            { T.TakeDamage(attackDamage); }
-        } 
+        float mouseX = lookInput.x * sensitivity * Time.deltaTime;
+        float mouseY = lookInput.y * sensitivity * Time.deltaTime;
+        xRotation -= mouseY;
+        xRotation = Mathf.Clamp(xRotation, -80f, 80f);
+        cam.transform.localRotation = Quaternion.Euler(xRotation, 0, 0);
+        transform.Rotate(Vector3.up * mouseX);
     }
 
-    void HitTarget(Vector3 pos)
+    void SwingSword(Vector2 mouseDelta)
     {
-        audioSource.pitch = 1;
-        audioSource.PlayOneShot(hitSound);
+        if (swordJoint == null || swordAnchor == null) return;
 
-        GameObject GO = Instantiate(hitEffect, pos, Quaternion.identity);
-        Destroy(GO, 20);
+        float swingX = mouseDelta.x * swordSwayIntensity * Time.deltaTime;
+        float swingY = mouseDelta.y * swordSwayIntensity * Time.deltaTime;
+
+        swordAnchor.localRotation *= Quaternion.Euler(-swingY, swingX, 0);
+        swordTargetRotation = swordAnchor.localRotation;
     }
+
+    void UpdateSwordPhysics()
+    {
+        if (swordJoint == null) return;
+        swordJoint.targetPosition = Vector3.zero;
+
+        if (!isAttackingMode)
+        {
+            swordTargetRotation = Quaternion.Slerp(swordTargetRotation, Quaternion.identity, Time.deltaTime * swordSmoothSpeed);
+            // Sync the anchor back so it doesn't "snap" when you click again
+            swordAnchor.localRotation = swordTargetRotation;
+        }
+
+        swordJoint.targetRotation = swordTargetRotation;
+    }
+
+    void Jump()
+    {
+        if (isGrounded) _PlayerVelocity.y = Mathf.Sqrt(jumpHeight * -2.0f * gravity);
+    }
+
+    void OnEnable() => input.Enable();
+    void OnDisable() => input.Disable();
 }
