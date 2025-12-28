@@ -18,88 +18,144 @@ public class PlayerController : MonoBehaviour
     public float sensitivity = 100f;
 
     [Header("Combat Physics")]
-    public Transform swordAnchor; // The ghost target childed to camera
-    public Rigidbody swordRb;     // The actual sword RB
-    public float windUpLimit = 10f; // Mouse distance required to "charge"
-    public float swingForce = 40f;
-    public float returnSpeed = 5f;
+    public Transform swordAnchor;
+    public Rigidbody swordRb;
+    public float windUpThreshold = 3f;
+    public float swingSensitivity = 5.0f;
+    public float maxSwingForce = 400f;
+    public float returnSpeed = 25f;
 
     private Vector3 _PlayerVelocity;
     private bool isGrounded;
     private float xRotation = 0f;
 
-    // Combat State Tracking
+    // Combat State
+    private Vector2 accumulatedDelta;
     private bool isCombatMode = false;
-    private Vector2 accumulatedMouseDelta;
-    private bool hasReachedWindUp = false;
+    private bool isSwinging = false;
 
     void Awake()
     {
         controller = GetComponent<CharacterController>();
-
-        // Initialize Input System
         playerInput = new PlayerInput();
         input = playerInput.Main;
 
-        // Lock Cursor
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
-        // Assign Jump Event
         input.Jump.performed += ctx => Jump();
     }
 
     void Update()
     {
         isGrounded = controller.isGrounded;
+        isCombatMode = Mouse.current.leftButton.isPressed;
 
-        // Detect the exact frame the button is released
         if (Mouse.current.leftButton.wasReleasedThisFrame)
         {
             ApplySwordBrake();
         }
-
-        isCombatMode = Mouse.current.leftButton.isPressed;
-
-        if (!isCombatMode)
-        {
-            ResetSwordPosition();
-        }
     }
 
-    void FixedUpdate()
-    {
-        MoveInput(input.Movement.ReadValue<Vector2>());
-    }
+    void FixedUpdate() => MoveInput(input.Movement.ReadValue<Vector2>());
 
     void LateUpdate()
     {
-        Vector2 lookValue = input.Look.ReadValue<Vector2>();
+        Vector2 lookInput = input.Look.ReadValue<Vector2>();
 
         if (isCombatMode)
         {
-            // Lock camera looking and move the sword instead
-            HandleSwordCombat(lookValue);
+            HandleSwordCombat(lookInput);
         }
         else
         {
-            // Default first-person looking
-            LookInput(lookValue);
+            LookInput(lookInput);
+            ResetAnchorSmoothly();
         }
     }
 
-    // --- MOVEMENT LOGIC ---
+    // --- COMBAT LOGIC ---
+
+    void HandleSwordCombat(Vector2 mouseDelta)
+    {
+        if (!isSwinging)
+        {
+            // 1. Accumulate movement
+            accumulatedDelta += mouseDelta * (sensitivity / 100f);
+
+            // 2. Calculate Angle for the Red Axis Normal Plane (Y-Z Plane)
+            if (accumulatedDelta.magnitude > 0.1f)
+            {
+                // Atan2 gives the angle in radians between the X-axis and the vector (y, x)
+                // We use this to find the direction the mouse has moved relative to center
+                float mouseAngle = Mathf.Atan2(accumulatedDelta.y, accumulatedDelta.x) * Mathf.Rad2Deg;
+                // 0 is right, 90 is up, 180/-180 is left, -90 is down
+
+                // We apply this angle to the sword's local Red (X) axis.
+                // This makes the sword tip (Green) rotate within the Y-Z plane 
+                // to match the "heading" of your mouse pullback.
+                swordAnchor.localRotation = Quaternion.Slerp(
+                    swordAnchor.localRotation,
+                    Quaternion.Euler(0, 0, mouseAngle-90),
+                    Time.deltaTime * 20f
+                );
+            }
+
+            // 3. SWING DETECTION
+            float reversalDot = Vector2.Dot(mouseDelta.normalized, accumulatedDelta.normalized);
+
+            if (accumulatedDelta.magnitude > windUpThreshold && reversalDot < -0.7f)
+            {
+                ExecuteSwing(mouseDelta);
+            }
+        }
+    }
+
+    void ExecuteSwing(Vector2 flickDelta)
+    {
+        isSwinging = true;
+
+        float force = Mathf.Clamp(flickDelta.magnitude * swingSensitivity, 120f, maxSwingForce);
+
+        // --- WORLD SPACE TORQUE ---
+        // Pushes the sword opposite to the pullback direction using Camera coordinates
+        Vector3 torqueDirection = (cam.transform.up * flickDelta.x) + (cam.transform.right * -flickDelta.y);
+
+        swordRb.AddTorque(torqueDirection * force, ForceMode.Impulse);
+
+        // Clear state
+        accumulatedDelta = Vector2.zero;
+        Invoke("EndSwingState", 0.4f);
+    }
+
+    void EndSwingState() => isSwinging = false;
+
+    void ApplySwordBrake()
+    {
+        swordRb.angularVelocity = Vector3.zero;
+        swordRb.linearVelocity = Vector3.zero;
+        swordRb.angularDamping = 50f;
+
+        accumulatedDelta = Vector2.zero;
+        isSwinging = false;
+
+        Invoke("RestorePhysics", 0.15f);
+    }
+
+    void RestorePhysics() => swordRb.angularDamping = 2f;
+
+    void ResetAnchorSmoothly()
+    {
+        swordAnchor.localRotation = Quaternion.Slerp(swordAnchor.localRotation, Quaternion.identity, Time.deltaTime * returnSpeed);
+    }
+
+    // --- STANDARD MOVEMENT & LOOK ---
 
     void MoveInput(Vector2 moveInput)
     {
         Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
         controller.Move(move * moveSpeed * Time.deltaTime);
-
-        if (isGrounded && _PlayerVelocity.y < 0)
-        {
-            _PlayerVelocity.y = -2f;
-        }
-
+        if (isGrounded && _PlayerVelocity.y < 0) _PlayerVelocity.y = -2f;
         _PlayerVelocity.y += gravity * Time.deltaTime;
         controller.Move(_PlayerVelocity * Time.deltaTime);
     }
@@ -108,107 +164,17 @@ public class PlayerController : MonoBehaviour
     {
         float mouseX = lookInput.x * sensitivity * Time.deltaTime;
         float mouseY = lookInput.y * sensitivity * Time.deltaTime;
-
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -80f, 80f);
         cam.transform.localRotation = Quaternion.Euler(xRotation, 0, 0);
-
         transform.Rotate(Vector3.up * mouseX);
     }
 
     void Jump()
     {
-        if (isGrounded)
-        {
-            _PlayerVelocity.y = Mathf.Sqrt(jumpHeight * -2.0f * gravity);
-        }
+        if (isGrounded) _PlayerVelocity.y = Mathf.Sqrt(jumpHeight * -2.0f * gravity);
     }
 
-    // --- COMBAT LOGIC ---
-
-    void HandleSwordCombat(Vector2 mouseDelta)
-    {
-        // 1. Accumulate mouse movement while holding click
-        accumulatedMouseDelta += mouseDelta * (sensitivity / 100f);
-
-        // Clamp it so the wind-up doesn't go behind the player's head
-        accumulatedMouseDelta.x = Mathf.Clamp(accumulatedMouseDelta.x, -windUpLimit * 1.5f, windUpLimit * 1.5f);
-        accumulatedMouseDelta.y = Mathf.Clamp(accumulatedMouseDelta.y, -windUpLimit * 1.5f, windUpLimit * 1.5f);
-
-        // 2. Visual Wind-up: Rotate the anchor so the sword tip follows mouse direction
-        // Pitch (X) is controlled by Mouse Y, Yaw (Y) is controlled by Mouse X
-        Quaternion targetWindUp = Quaternion.Euler(-accumulatedMouseDelta.y * 2, accumulatedMouseDelta.x * 2, 0);
-        swordAnchor.localRotation = Quaternion.Slerp(swordAnchor.localRotation, targetWindUp, Time.deltaTime * 15f);
-
-        // 3. Detect "Swipe Back"
-        // First check if we've moved the mouse far enough to count as a "wind up"
-        if (accumulatedMouseDelta.magnitude > windUpLimit)
-        {
-            hasReachedWindUp = true;
-        }
-
-        if (hasReachedWindUp)
-        {
-            // Dot Product check: is the current mouse frame moving OPPOSITE to the total wind-up?
-            float directionMatch = Vector2.Dot(mouseDelta.normalized, accumulatedMouseDelta.normalized);
-
-            // If moving opposite (-0.5 or less) and with enough speed
-            if (directionMatch < -0.5f && mouseDelta.magnitude > 2f)
-            {
-                ExecuteSwing(mouseDelta);
-            }
-        }
-    }
-
-    void ExecuteSwing(Vector2 swingDirection)
-    {
-        // Calculate a world-space direction based on where the anchor is pointing
-        // We push the sword in the direction of the "swipe back"
-        Vector3 forceDir = cam.transform.TransformDirection(new Vector3(swingDirection.x, swingDirection.y, 1f));
-
-        swordRb.AddForce(forceDir * swingForce, ForceMode.Impulse);
-
-        // Add some torque for that "swinging arc" feel
-        Vector3 torqueDir = new Vector3(-swingDirection.y, swingDirection.x, 0);
-        swordRb.AddRelativeTorque(torqueDir * swingForce, ForceMode.Impulse);
-
-        // Reset tracking so we can swing again or wind up again
-        accumulatedMouseDelta = Vector2.zero;
-        hasReachedWindUp = false;
-    }
-
-    void ApplySwordBrake()
-    {
-        // Kill the physical momentum immediately
-        swordRb.angularVelocity = Vector3.zero;
-        swordRb.linearVelocity = Vector3.zero;
-
-        // Temporarily crank up drag to prevent "wobble"
-        swordRb.angularDamping = 20f;
-        swordRb.linearDamping = 5f;
-
-        // Reset tracking variables
-        accumulatedMouseDelta = Vector2.zero;
-        hasReachedWindUp = false;
-
-        // Return drag to normal after the sword has settled (0.2 seconds)
-        Invoke("RestoreNormalPhysics", 0.2f);
-    }
-
-    void RestoreNormalPhysics()
-    {
-        swordRb.angularDamping = 2f; // Or whatever your default was
-        swordRb.linearDamping = 0f;
-    }
-
-    void ResetSwordPosition()
-    {
-        // Rapidly snap the anchor back to the default camera forward position
-        swordAnchor.localRotation = Quaternion.Slerp(swordAnchor.localRotation, Quaternion.identity, Time.deltaTime * 20f);
-
-        // Ensure the accumulated delta doesn't "leak" into the next click
-        accumulatedMouseDelta = Vector2.zero;
-    }
     void OnEnable() => input.Enable();
     void OnDisable() => input.Disable();
 }
